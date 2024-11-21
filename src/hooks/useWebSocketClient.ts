@@ -62,10 +62,21 @@ const useWebSocketClient = <T>(
           // Handle ping frame, each ws client has a different implementation
           if (data === "ping frame") {
             wsClient.send(channel, "pong frame");
+
             return;
           }
-          // Parse and emit the data received from the WebSocket
-          subscriber.next(JSON.parse(data));
+
+          const pData = JSON.parse(data);
+
+          // Handle possible error codes, each ws client has a different implementation
+          if ("code" in pData) {
+            subscriber.error(pData.error);
+
+            return;
+          }
+
+          // Send data to subscriber
+          subscriber.next(pData);
         } catch (error) {
           subscriber.error(`Failed to process message: ${error}`);
         }
