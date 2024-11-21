@@ -1,6 +1,6 @@
 import { expose } from "comlink";
 
-export interface WebSocketClient {
+interface WebSocketClient {
   connect(channel: string, url: string): void;
   disconnect(channel: string): void;
   send(channel: string, message: string): void;
@@ -49,3 +49,5 @@ class WebSocketClientImpl implements WebSocketClient {
 }
 
 expose(new WebSocketClientImpl());
+
+export type { WebSocketClient };

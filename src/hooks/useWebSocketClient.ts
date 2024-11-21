@@ -16,15 +16,12 @@ const createWorker = () => {
 const worker = createWorker();
 const wsClient = worker ? wrap<WebSocketClient>(worker) : null;
 
-interface MessageEventData {
+type MessageEventData = {
   channel: string;
   data: string;
-}
+};
 
-export const useWebSocketClient = <T>(
-  channel: string,
-  url: string
-): Observable<T> => {
+const useWebSocketClient = <T>(channel: string, url: string): Observable<T> => {
   // Ensure the hook is only used in the browser
   if (!wsClient || typeof window === "undefined") {
     console.warn("useWebSocketClient must only be used in the browser.");
@@ -64,3 +61,5 @@ export const useWebSocketClient = <T>(
     };
   });
 };
+
+export { useWebSocketClient };
