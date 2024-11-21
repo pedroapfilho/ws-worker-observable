@@ -1,23 +1,26 @@
 import { expose } from "comlink";
 
-interface WebSocketClient {
-  connect(channel: string, url: string): void;
-  disconnect(channel: string): void;
-  send(channel: string, message: string): void;
-}
-
-class WebSocketClientImpl implements WebSocketClient {
+class WebSocketClient {
   private connections: Map<string, WebSocket> = new Map();
 
+  /**
+   * Connects to a WebSocket channel.
+   *
+   * @param {string} channel - The WebSocket channel to connect to.
+   * @param {string} url - The WebSocket server URL.
+   */
   connect(channel: string, url: string): void {
     if (this.connections.has(channel)) {
       console.warn(`Already connected to channel: ${channel}`);
+
       return;
     }
 
     const ws = new WebSocket(url);
 
     ws.onmessage = (event: MessageEvent) => {
+      // console.log("MESSAGE EVENT", event);
+
       self.postMessage({ channel, data: event.data });
     };
 
@@ -28,6 +31,11 @@ class WebSocketClientImpl implements WebSocketClient {
     this.connections.set(channel, ws);
   }
 
+  /**
+   * Disconnects from a WebSocket channel.
+   *
+   * @param {string} channel - The WebSocket channel to disconnect from.
+   */
   disconnect(channel: string): void {
     const ws = this.connections.get(channel);
     if (ws) {
@@ -36,10 +44,15 @@ class WebSocketClientImpl implements WebSocketClient {
     }
   }
 
+  /**
+   * Sends a message to a WebSocket channel.
+   *
+   * @param {string} channel - The WebSocket channel to send the message to.
+   * @param {string} message - The message to send.
+   */
   send(channel: string, message: string): void {
-    console.log({ message, channel });
-
     const ws = this.connections.get(channel);
+
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(message);
     } else {
@@ -48,6 +61,6 @@ class WebSocketClientImpl implements WebSocketClient {
   }
 }
 
-expose(new WebSocketClientImpl());
+expose(new WebSocketClient());
 
 export type { WebSocketClient };
