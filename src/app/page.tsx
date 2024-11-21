@@ -4,18 +4,27 @@ import React from "react";
 import { useWebSocketData } from "@/hooks/useWebSocketData";
 
 const Page = () => {
-  const channel = "order-book";
-  const url = "wss://stream.binance.com:9443/ws/btcusdt@depth20";
-  const data = useWebSocketData(channel, url);
+  const ob = useWebSocketData(
+    "order-book",
+    "wss://stream.binance.com:9443/ws/btcusdt@depth20"
+  );
+  const trade = useWebSocketData(
+    "trade",
+    "wss://stream.binance.com:9443/ws/btcusdt@trade"
+  );
 
   return (
     <div>
-      <h1>WebSocket Data</h1>
-
-      {data ? (
-        <pre>{JSON.stringify(data, null, 2)}</pre>
+      {trade ? (
+        <pre>{JSON.stringify(trade, null, 2)}</pre>
       ) : (
-        <p>Waiting for data...</p>
+        <p>Waiting for trade data...</p>
+      )}
+
+      {ob ? (
+        <pre>{JSON.stringify(ob, null, 2)}</pre>
+      ) : (
+        <p>Waiting for order book data...</p>
       )}
     </div>
   );

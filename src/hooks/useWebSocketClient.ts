@@ -24,14 +24,10 @@ type MessageEventData = {
 const useWebSocketClient = <T>(channel: string, url: string): Observable<T> => {
   // Ensure the hook is only used in the browser
   if (!wsClient || typeof window === "undefined") {
-    console.warn("useWebSocketClient must only be used in the browser.");
-
     return new Observable<T>();
   }
 
   return new Observable<T>((subscriber) => {
-    console.log(`Subscribing to channel: ${channel}`);
-
     try {
       wsClient.connect(channel, url);
     } catch (error) {
