@@ -32,11 +32,11 @@ type MessageEventData = {
 const useWebSocketClient = <T>(
   channel: string,
   url: string
-): { observable: Observable<T>; send: (message: string) => void } => {
+): { observable$: Observable<T>; send: (message: string) => void } => {
   // Handle the case where the WebSocket client is not available (e.g. in Node.js)
   if (!wsClient || typeof window === "undefined") {
     return {
-      observable: new Observable<T>(),
+      observable$: new Observable<T>(),
       send: () => {
         throw new Error("WebSocket client is not available");
       },
@@ -44,7 +44,7 @@ const useWebSocketClient = <T>(
   }
 
   // Create an observable to handle WebSocket messages
-  const observable = new Observable<T>((subscriber) => {
+  const observable$ = new Observable<T>((subscriber) => {
     try {
       // Connect to the WebSocket channel
       wsClient.connect(channel, url);
@@ -99,7 +99,7 @@ const useWebSocketClient = <T>(
     wsClient.send(channel, message);
   };
 
-  return { observable, send };
+  return { observable$, send };
 };
 
 export { useWebSocketClient };

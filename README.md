@@ -1,10 +1,10 @@
-# WS Worker Observable
+# WS Worker Observable Example
 
 ## Overview
 
-WS Worker Observable is a TypeScript-based library designed to facilitate real-time data handling through WebSockets in a React application. It leverages RxJS observables and Web Workers to manage WebSocket connections efficiently, ensuring smooth and responsive user interfaces even when dealing with high-frequency data streams.
+This is a TypeScript-based example designed to show how real-time data handling through WebSockets in a React application is made on high frequency apps. It leverages RxJS observables and Web Workers to manage WebSocket connections efficiently, ensuring smooth and responsive user interfaces even when dealing with high-frequency data streams.
 
-## Features
+## What's Included
 
 - **WebSocket Management**: Simplifies the process of connecting to WebSocket channels and handling incoming data.
 - **RxJS Integration**: Utilizes RxJS observables to provide a reactive programming model for WebSocket data.
@@ -240,9 +240,9 @@ export default Page;
 - Type Safety: TypeScript provides type safety, reducing the likelihood of runtime errors and improving code maintainability.
 - Ease of Use: The hooks abstract away the complexity of WebSocket management, making it easy to integrate real-time data into React components.
 
-#### Conclusion
+#### Diagram
 
-WS Worker Observable is a powerful tool for developers looking to integrate real-time data into their React applications efficiently. By leveraging Web Workers and RxJS, it provides a performant and scalable solution for handling WebSocket connections.
+![Diagram](public/diagram.svg)
 
 #### Binance API Documentation
 

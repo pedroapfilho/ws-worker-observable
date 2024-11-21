@@ -14,10 +14,10 @@ const useWebSocketData = <T>(
   url: string
 ): { data: T | null; send: (message: string) => void } => {
   // Use the custom hook to get the observable and send function for the WebSocket client
-  const { observable, send } = useWebSocketClient<T>(channel, url);
+  const { observable$, send } = useWebSocketClient<T>(channel, url);
 
   // Use the observable state hook to subscribe to the observable and get the latest data
-  const [data] = useObservableState<T | null>(() => observable, null);
+  const [data] = useObservableState<T | null>(() => observable$, null);
 
   return { data, send };
 };
