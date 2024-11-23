@@ -2,6 +2,7 @@ import { expose } from "comlink";
 
 class WebSocketClient {
   private connections: Map<string, WebSocket> = new Map();
+  private reconnectInterval: number = 5000;
 
   /**
    * Connects to a WebSocket channel.
@@ -26,9 +27,25 @@ class WebSocketClient {
 
     ws.onclose = () => {
       this.connections.delete(channel);
+
+      this.reconnect(channel, url);
+    };
+
+    ws.onerror = () => {
+      this.connections.delete(channel);
+
+      this.reconnect(channel, url);
     };
 
     this.connections.set(channel, ws);
+  }
+
+  private reconnect(channel: string, url: string): void {
+    setTimeout(() => {
+      console.log(`Reconnecting to channel: ${channel}`);
+
+      this.connect(channel, url);
+    }, this.reconnectInterval);
   }
 
   /**
