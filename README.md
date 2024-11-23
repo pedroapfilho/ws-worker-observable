@@ -26,42 +26,93 @@ npm install observable-hooks rxjs comlink
 The `WebSocketClient` class manages WebSocket connections, sending messages, and handling incoming data.
 
 ```typescript
+import { expose } from "comlink";
+
 class WebSocketClient {
-    private connections: Map<string, WebSocket> = new Map();
+  private connections: Map<string, WebSocket> = new Map();
+  private reconnectInterval: number = 5000;
+  private shouldReconnect: Map<string, boolean> = new Map();
 
-    connect(channel: string, url: string): void {
-        if (this.connections.has(channel)) {
-            console.warn(`Already connected to channel: ${channel}`);
-            return;
-        }
-
-        const ws = new WebSocket(url);
-        ws.onmessage = (event: MessageEvent) => {
-            self.postMessage({ channel, data: event.data });
-        };
-        ws.onclose = () => {
-            this.connections.delete(channel);
-        };
-        this.connections.set(channel, ws);
+  /**
+   * Connects to a WebSocket channel.
+   *
+   * @param {string} channel - The WebSocket channel to connect to.
+   * @param {string} url - The WebSocket server URL.
+   */
+  connect(channel: string, url: string): void {
+    if (this.connections.has(channel)) {
+      console.warn(`Already connected to channel: ${channel}`);
+      return;
     }
 
-    disconnect(channel: string): void {
-        const ws = this.connections.get(channel);
-        if (ws) {
-            ws.close();
-            this.connections.delete(channel);
-        }
-    }
+    const ws = new WebSocket(url);
 
-    send(channel: string, message: string): void {
-        const ws = this.connections.get(channel);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(message);
-        } else {
-            console.error(`No open connection for channel: ${channel}`);
-        }
+    ws.onmessage = (event: MessageEvent) => {
+      self.postMessage({ channel, data: event.data });
+    };
+
+    ws.onclose = () => {
+      this.connections.delete(channel);
+      this.reconnect(channel, url);
+    };
+
+    ws.onerror = () => {
+      this.connections.delete(channel);
+      this.reconnect(channel, url);
+    };
+
+    this.connections.set(channel, ws);
+    this.shouldReconnect.set(channel, true);
+  }
+
+  /**
+   * Attempts to reconnect to a WebSocket channel after a specified interval.
+   *
+   * @param {string} channel - The WebSocket channel to reconnect to.
+   * @param {string} url - The WebSocket server URL.
+   */
+  private reconnect(channel: string, url: string): void {
+    if (this.shouldReconnect.get(channel)) {
+      setTimeout(() => {
+        console.log(`Reconnecting to channel: ${channel}`);
+        this.connect(channel, url);
+      }, this.reconnectInterval);
     }
+  }
+
+  /**
+   * Disconnects from a WebSocket channel.
+   *
+   * @param {string} channel - The WebSocket channel to disconnect from.
+   */
+  disconnect(channel: string): void {
+    const ws = this.connections.get(channel);
+    if (ws) {
+      this.shouldReconnect.set(channel, false);
+      ws.close();
+      this.connections.delete(channel);
+    }
+  }
+
+  /**
+   * Sends a message to a WebSocket channel.
+   *
+   * @param {string} channel - The WebSocket channel to send the message to.
+   * @param {string} message - The message to send.
+   */
+  send(channel: string, message: string): void {
+    const ws = this.connections.get(channel);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    } else {
+      console.error(`No open connection for channel: ${channel}`);
+    }
+  }
 }
+
+expose(new WebSocketClient());
+
+export type { WebSocketClient };
 ```
 
 ### Usage
@@ -80,76 +131,76 @@ import { Observable } from "rxjs";
 import type { WebSocketClient } from "../workers/wsClient";
 
 const createWorker = (): Worker | null => {
-    if (typeof window !== "undefined") {
-        return new Worker(new URL("../workers/wsClient", import.meta.url), {
-            type: "module",
-        });
-    }
-    return null;
+  if (typeof window !== "undefined") {
+    return new Worker(new URL("../workers/wsClient", import.meta.url), {
+      type: "module",
+    });
+  }
+  return null;
 };
 
 const worker = createWorker();
 const wsClient = worker ? wrap<WebSocketClient>(worker) : null;
 
 type MessageEventData = {
-    channel: string;
-    data: string;
+  channel: string;
+  data: string;
 };
 
 const useWebSocketClient = <T>(
-    channel: string,
-    url: string
-): { observable: Observable<T>; send: (message: string) => void } => {
-    if (!wsClient || typeof window === "undefined") {
-        return {
-            observable: new Observable<T>(),
-            send: () => {
-                throw new Error("WebSocket client is not available");
-            },
-        };
+  channel: string,
+  url: string
+): { observable$: Observable<T>; send: (message: string) => void } => {
+  if (!wsClient || typeof window === "undefined") {
+    return {
+      observable$: new Observable<T>(),
+      send: () => {
+        throw new Error("WebSocket client is not available");
+      },
+    };
+  }
+
+  const observable$ = new Observable<T>((subscriber) => {
+    try {
+      wsClient.connect(channel, url);
+    } catch (error) {
+      subscriber.error(`Failed to connect to channel ${channel}: ${error}`);
+      return;
     }
 
-    const observable = new Observable<T>((subscriber) => {
+    const listener = async (event: MessageEvent) => {
+      const { channel: eventChannel, data } = event.data as MessageEventData;
+      if (eventChannel === channel) {
         try {
-            wsClient.connect(channel, url);
-        } catch (error) {
-            subscriber.error(`Failed to connect to channel ${channel}: ${error}`);
+          if (data === "ping frame") {
+            wsClient.send(channel, "pong frame");
             return;
+          }
+          const pData = JSON.parse(data);
+          if ("code" in pData) {
+            subscriber.error(pData.error);
+            return;
+          }
+          subscriber.next(pData);
+        } catch (error) {
+          subscriber.error(`Failed to process message: ${error}`);
         }
-
-        const listener = async (event: MessageEvent) => {
-            const { channel: eventChannel, data } = event.data as MessageEventData;
-            if (eventChannel === channel) {
-                try {
-                    if (data === "ping frame") {
-                        wsClient.send(channel, "pong frame");
-                        return;
-                    }
-                    const pData = JSON.parse(data);
-                    if ("code" in pData) {
-                        subscriber.error(pData.error);
-                        return;
-                    }
-                    subscriber.next(pData);
-                } catch (error) {
-                    subscriber.error(`Failed to process message: ${error}`);
-                }
-            }
-        };
-
-        worker?.addEventListener("message", listener);
-
-        return () => {
-            worker?.removeEventListener("message", listener);
-            wsClient.disconnect(channel);
-        };
-    });
-
-    const send = (message: string) => {
-        wsClient.send(channel, message);
+      }
     };
 
-    return { observable, send };
+    worker?.addEventListener("message", listener);
+
+    return () => {
+      worker?.removeEventListener("message", listener);
+      wsClient.disconnect(channel);
+    };
+  });
+
+  const send = (message: string) => {
+    wsClient.send(channel, message);
+  };
+
+  return { observable$, send };
 };
 
 export { useWebSocketClient };
@@ -164,12 +215,12 @@ import { useObservableState } from "observable-hooks";
 import { useWebSocketClient } from "@/hooks/useWebSocketClient";
 
 const useWebSocketData = <T>(
-    channel: string,
-    url: string
+  channel: string,
+  url: string
 ): { data: T | null; send: (message: string) => void } => {
-    const { observable, send } = useWebSocketClient<T>(channel, url);
-    const [data] = useObservableState<T | null>(() => observable, null);
-    return { data, send };
+  const { observable$, send } = useWebSocketClient<T>(channel, url);
+  const [data] = useObservableState<T | null>(() => observable$, null);
+  return { data, send };
 };
 
 export { useWebSocketData };
@@ -186,48 +237,48 @@ import React from "react";
 import { useWebSocketData } from "@/hooks/useWebSocketData";
 
 type TradeData = {
-    e: string;
-    E: number;
-    s: string;
-    t: number;
-    p: string;
-    q: string;
-    T: number;
-    m: boolean;
-    M: boolean;
+  e: string;
+  E: number;
+  s: string;
+  t: number;
+  p: string;
+  q: string;
+  T: number;
+  m: boolean;
+  M: boolean;
 };
 
 type OrderBookData = {
-    lastUpdateId: number;
-    bids: [string, string][];
-    asks: [string, string][];
+  lastUpdateId: number;
+  bids: [string, string][];
+  asks: [string, string][];
 };
 
 const Page = () => {
-    const { data: orderBookData } = useWebSocketData<OrderBookData>(
-        "order-book",
-        "wss://stream.binance.com:9443/ws/btcusdt@depth20/"
-    );
-    const { data: tradeData } = useWebSocketData<TradeData>(
-        "trade",
-        "wss://stream.binance.com:9443/ws/btcusdt@trade/"
-    );
+  const { data: orderBookData } = useWebSocketData<OrderBookData>(
+    "order-book",
+    "wss://stream.binance.com:9443/ws/btcusdt@depth20"
+  );
+  const { data: tradeData } = useWebSocketData<TradeData>(
+    "trade",
+    "wss://stream.binance.com:9443/ws/btcusdt@trade"
+  );
 
-    return (
-        <div>
-            {tradeData ? (
-                <pre>{JSON.stringify(tradeData, null, 2)}</pre>
-            ) : (
-                <p>Waiting for trade data...</p>
-            )}
+  return (
+    <div>
+      {tradeData ? (
+        <pre>{JSON.stringify(tradeData, null, 2)}</pre>
+      ) : (
+        <p>Waiting for trade data...</p>
+      )}
 
-            {orderBookData ? (
-                <pre>{JSON.stringify(orderBookData, null, 2)}</pre>
-            ) : (
-                <p>Waiting for order book data...</p>
-            )}
-        </div>
-    );
+      {orderBookData ? (
+        <pre>{JSON.stringify(orderBookData, null, 2)}</pre>
+      ) : (
+        <p>Waiting for order book data...</p>
+      )}
+    </div>
+  );
 };
 
 export default Page;
