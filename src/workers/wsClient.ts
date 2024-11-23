@@ -3,6 +3,7 @@ import { expose } from "comlink";
 class WebSocketClient {
   private connections: Map<string, WebSocket> = new Map();
   private reconnectInterval: number = 5000;
+  private shouldReconnect: Map<string, boolean> = new Map();
 
   /**
    * Connects to a WebSocket channel.
@@ -38,14 +39,23 @@ class WebSocketClient {
     };
 
     this.connections.set(channel, ws);
+    this.shouldReconnect.set(channel, true);
   }
 
+  /**
+   * Attempts to reconnect to a WebSocket channel after a specified interval.
+   *
+   * @param {string} channel - The WebSocket channel to reconnect to.
+   * @param {string} url - The WebSocket server URL.
+   */
   private reconnect(channel: string, url: string): void {
-    setTimeout(() => {
-      console.log(`Reconnecting to channel: ${channel}`);
+    if (this.shouldReconnect.get(channel)) {
+      setTimeout(() => {
+        console.log(`Reconnecting to channel: ${channel}`);
 
-      this.connect(channel, url);
-    }, this.reconnectInterval);
+        this.connect(channel, url);
+      }, this.reconnectInterval);
+    }
   }
 
   /**
@@ -56,6 +66,7 @@ class WebSocketClient {
   disconnect(channel: string): void {
     const ws = this.connections.get(channel);
     if (ws) {
+      this.shouldReconnect.set(channel, false);
       ws.close();
       this.connections.delete(channel);
     }
