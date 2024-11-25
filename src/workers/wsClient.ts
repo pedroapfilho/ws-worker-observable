@@ -23,6 +23,9 @@ class WebSocketClient {
     ws.onmessage = (event: MessageEvent) => {
       // console.log("MESSAGE EVENT", event);
 
+      // Fake heavy calculation
+      for (let i = 0; i < 10000000; i += 1) {}
+
       self.postMessage({ channel, data: event.data });
     };
 

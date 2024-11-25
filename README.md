@@ -48,6 +48,11 @@ class WebSocketClient {
     const ws = new WebSocket(url);
 
     ws.onmessage = (event: MessageEvent) => {
+      // console.log("MESSAGE EVENT", event);
+
+      // Fake heavy calculation
+      for (let i = 0; i < 10000000; i += 1) {}
+
       self.postMessage({ channel, data: event.data });
     };
 
@@ -290,6 +295,10 @@ export default Page;
 - Scalability: The use of RxJS observables allows for easy composition and transformation of data streams, making it suitable for complex real-time applications.
 - Type Safety: TypeScript provides type safety, reducing the likelihood of runtime errors and improving code maintainability.
 - Ease of Use: The hooks abstract away the complexity of WebSocket management, making it easy to integrate real-time data into React components.
+
+#### Note on Web Workers
+
+Web Workers are particularly useful when you need to process data received from WebSockets. They allow you to offload heavy computations to a separate thread, ensuring that the main thread remains responsive. If your application only needs to handle simple WebSocket messages without significant processing, using Web Workers might not be necessary.
 
 #### Diagram
 
