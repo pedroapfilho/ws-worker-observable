@@ -9,7 +9,7 @@ import { useWebSocketClient } from "@/hooks/useWebSocketClient";
  * @param {string} url - The WebSocket server URL.
  * @returns {{ data: T | null, send: (message: any) => void }} - An object containing the latest data received from the WebSocket and a send function to send messages to the WebSocket.
  */
-const useWebSocketData = <T>(
+const useWebSocketData = <T extends object>(
   channel: string,
   url: string
 ): { data: T | null; send: (message: string) => void } => {

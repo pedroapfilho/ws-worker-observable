@@ -4,16 +4,19 @@ import type { WebSocketClient } from "../workers/wsClient";
 
 const createWorker = (): Worker | null => {
   // Check if the code is running in a browser environment
-  if (typeof window !== "undefined") {
-    return new Worker(new URL("../workers/wsClient", import.meta.url), {
-      type: "module",
-    });
+  if (typeof window === "undefined") {
+    return null;
   }
-  return null;
+
+  return new Worker(new URL("../workers/wsClient", import.meta.url), {
+    type: "module",
+  });
 };
 
+// Create a worker to handle WebSocket connections
 const worker = createWorker();
 
+// Wrap the worker to create a proxy object, or set it to null if the worker is not available (e.g. in Node.js)
 const wsClient = worker ? wrap<WebSocketClient>(worker) : null;
 
 type MessageEventData = {
@@ -29,12 +32,12 @@ type MessageEventData = {
  * @param {string} url - The WebSocket server URL.
  * @returns {{ observable: Observable<T>, send: (message: any) => void }} - An object containing the observable and a send function to send messages to the WebSocket.
  */
-const useWebSocketClient = <T>(
+const useWebSocketClient = <T extends object>(
   channel: string,
   url: string
 ): { observable$: Observable<T>; send: (message: string) => void } => {
   // Handle the case where the WebSocket client is not available (e.g. in Node.js)
-  if (!wsClient || typeof window === "undefined") {
+  if (!wsClient || !worker || typeof window === "undefined") {
     return {
       observable$: new Observable<T>(),
       send: () => {
@@ -66,10 +69,11 @@ const useWebSocketClient = <T>(
             return;
           }
 
-          const pData = JSON.parse(data);
+          // Parse the message data, this depends on the server implementation, but it's usually JSON
+          const pData = JSON.parse(data) as T;
 
           // Handle possible error codes, each ws client has a different implementation
-          if ("code" in pData) {
+          if ("code" in pData && "error" in pData) {
             subscriber.error(pData.error);
 
             return;
@@ -78,17 +82,18 @@ const useWebSocketClient = <T>(
           // Send data to subscriber
           subscriber.next(pData);
         } catch (error) {
+          // Handle errors when parsing messages
           subscriber.error(`Failed to process message: ${error}`);
         }
       }
     };
 
     // Add event listener for messages
-    worker?.addEventListener("message", listener);
+    worker.addEventListener("message", listener);
 
     // Cleanup function to remove event listener and close connection
     return () => {
-      worker?.removeEventListener("message", listener);
+      worker.removeEventListener("message", listener);
 
       wsClient.disconnect(channel);
     };
